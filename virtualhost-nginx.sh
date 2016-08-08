@@ -62,51 +62,94 @@ if [ "$action" == 'create' ]
 					echo $"Added content to $userDir$rootDir/phpinfo.php."
 			fi
 		fi
+		
+		### create let'sencrypt cert only.
+		
+		letsencrypt certonly —webroot -w $userDir$rootDir -d $domain
 
 		### create virtual host rules file
-		if ! echo "server {
-			listen   80;
-			root $userDir$rootDir;
-			index index.php index.html index.htm;
-			server_name $domain;
+		if ! echo "
 
-			# serve static files directly
-			location ~* \.(jpg|jpeg|gif|css|png|js|ico|html)$ {
-				access_log off;
-				expires max;
-			}
 
-			# removes trailing slashes (prevents SEO duplicate content issues)
-			if (!-d \$request_filename) {
-				rewrite ^/(.+)/\$ /\$1 permanent;
-			}
+#SSL HTTP2.0 Letsencrypt
 
-			# unless the request is for a valid file (image, js, css, etc.), send to bootstrap
-			if (!-e \$request_filename) {
-				rewrite ^/(.*)\$ /index.php?/\$1 last;
-				break;
-			}
+server {
+    
+    listen 80 443 ssl http2;
+    listen [::]:80;
+    listen [::]:443;
 
-			# removes trailing 'index' from all controllers
-			if (\$request_uri ~* index/?\$) {
-				rewrite ^/(.*)/index/?\$ /\$1 permanent;
-			}
+    rewrite ^ https://$server_name$request_uri? permanent;
+    server_name  $domain;
+    root $userDir$rootDir;
 
-			# catch all
-			error_page 404 /index.php;
+# Add index.php to the list if you are using PHP
 
-			location ~ \.php$ {
-				fastcgi_split_path_info ^(.+\.php)(/.+)\$;
-				fastcgi_pass 127.0.0.1:9000;
-				fastcgi_index index.php;
-				include fastcgi_params;
-			}
+    index index.php index.html index.htm index.nginx-debian.html;    
 
-			location ~ /\.ht {
-				deny all;
-			}
+    error_page  404              /404.html;
+    error_page  500 502 503 504  /50x.html;
 
-		}" > $sitesAvailable$domain
+    access_log  /var/log/nginx/access.log;
+
+    ssl_certificate      /etc/letsencrypt/live/$domain/fullchain.pem;
+    ssl_certificate_key  /etc/letsencrypt/live/$domain/privkey.pem;
+    ssl_session_timeout  1d;
+    ssl_session_cache    shared:SSL:10m;
+    ssl_session_tickets  off;
+    ssl_stapling         on;
+    ssl_stapling_verify  on;
+
+# Generate with:
+    # sudo openssl dhparam -out /etc/nginx/dhparam.pem 2048
+    ssl_dhparam  /etc/nginx/dhparam.pem;
+
+    ssl_protocols              TLSv1 TLSv1.1 TLSv1.2;
+    ssl_prefer_server_ciphers  on;
+    ssl_ciphers                'ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:DHE-DSS-AES128-GCM-SHA256:kEDH+AESGCM:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA:ECDHE-ECDSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-DSS-AES128-SHA256:DHE-RSA-AES256-SHA256:DHE-DSS-AES256-SHA:DHE-RSA-AES256-SHA:ECDHE-RSA-DES-CBC3-SHA:ECDHE-ECDSA-DES-CBC3-SHA:AES128-GCM-SHA256:AES256-GCM-SHA384:AES128-SHA256:AES256-SHA256:AES128-SHA:AES256-SHA:AES:CAMELLIA:DES-CBC3-SHA:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!PSK:!aECDH:!EDH-DSS-DES-CBC3-SHA:!EDH-RSA-DES-CBC3-SHA:!KRB5-DES-CBC3-SHA';
+
+    add_header  Strict-Transport-Security 'max-age=31536000; includeSubDomains';
+
+    location / {
+        index index.php;
+         try_files $uri $uri/ /index.php;
+    }
+
+     location ~ \.(js|css|png|jpg|gif|swf|ico|pdf|mov|fla|zip|rar|woff)$ {
+        expires    modified +1h;
+        try_files  $uri =404;
+    }
+
+
+#PHP7.0 Configuration [ENABLED]
+
+    location ~ \.php$ {
+
+    #   include snippets/fastcgi-php.conf;
+    #   fastcgi_pass unix:/var/run/php7.0-fpm.sock;
+
+    try_files $uri =404;
+        fastcgi_pass 127.0.0.1:9000;
+    fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_index index.php;
+        include fastcgi_params;
+    }
+
+    # deny access to .htaccess files, if Apache's document root
+    # concurs with nginx's one
+    
+    location ~ /\.ht {
+        deny all;
+    }
+
+    location ~ /.well-known {
+        allow all;
+    }
+
+}
+
+
+		" > $sitesAvailable$domain
 		then
 			echo -e $"There is an ERROR create $domain file"
 			exit;
@@ -136,7 +179,7 @@ if [ "$action" == 'create' ]
 		service nginx restart
 
 		### show the finished message
-		echo -e $"Complete! \nYou now have a new Virtual Host \nYour new host is: http://$domain \nAnd its located at $userDir$rootDir"
+		echo -e $"Complete! \nYou now have a new Virtual Host \nYour new host is: https://$domain \nAnd its located at $userDir$rootDir"
 		exit;
 	else
 		### check whether domain already exists
