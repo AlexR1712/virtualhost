@@ -63,29 +63,63 @@ if [ "$action" == 'create' ]
 			fi
 		fi
 		
-		### create let'sencrypt cert only.
-		
-		letsencrypt certonly —webroot -w $rootDir -d $domain
-
 		### create virtual host rules file
 		if ! echo "
 
-
-#SSL HTTP2.0 Letsencrypt
-
 server {
-    
-    listen 80 443 ssl http2;
-    listen [::]:80;
-    listen [::]:443;
-
-    rewrite ^ https://$server_name$request_uri? permanent;
-    server_name  $domain;
-    root $rootDir;
+     listen 80;
+     rewrite ^ https://\$server_name\$request_uri? permanent;
+	
+#root dir of host
+	root $rootDir;
 
 # Add index.php to the list if you are using PHP
 
-    index index.php index.html index.htm index.nginx-debian.html;    
+	index index.php index.html index.htm index.nginx-debian.html;
+
+	server_name $domain;
+
+	location / {
+		# First attempt to serve request as file, then
+		# as directory, then fall back to displaying a 404.
+		#try_files \$uri \$uri/ =404;
+		try_files \$uri \$uri/ /index.php;
+	}
+
+
+#PHP7.0 Configuration [ENABLED]
+
+	location ~ \.php$ {
+
+	#	include snippets/fastcgi-php.conf;
+	#	fastcgi_pass unix:/var/run/php7.0-fpm.sock;
+
+	try_files \$uri =404;
+        fastcgi_pass 127.0.0.1:9000;
+	fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
+        fastcgi_index index.php;
+        include fastcgi_params;
+	}
+
+	# deny access to .htaccess files, if Apache's document root
+	# concurs with nginx's one
+	
+	location ~ /\.ht {
+		deny all;
+	}
+
+    location ~ /.well-known {
+        allow all;
+    }
+
+}
+
+
+#SSL Letsencrypt
+server {
+    listen       443 ssl http2;
+    server_name  $domain;
+    root $rootDir;
 
     error_page  404              /404.html;
     error_page  500 502 503 504  /50x.html;
@@ -100,7 +134,7 @@ server {
     ssl_stapling         on;
     ssl_stapling_verify  on;
 
-# Generate with:
+    # Generate with:
     # sudo openssl dhparam -out /etc/nginx/dhparam.pem 2048
     ssl_dhparam  /etc/nginx/dhparam.pem;
 
@@ -112,44 +146,40 @@ server {
 
     location / {
         index index.php;
-         try_files $uri $uri/ /index.php;
+         try_files \$uri \$uri/ /index.php;
     }
 
-     location ~ \.(js|css|png|jpg|gif|swf|ico|pdf|mov|fla|zip|rar|woff)$ {
+     location ~ \.(js|css|png|jpg|gif|swf|ico|pdf|mov|fla|zip|rar|woff)\$ {
         expires    modified +1h;
-        try_files  $uri =404;
+        try_files  \$uri =404;
     }
 
 
 #PHP7.0 Configuration [ENABLED]
+ 
+        location ~ \.php\$ {
+        
+        #include snippets/fastcgi-php.conf;
+        #fastcgi_pass unix:/var/run/php7.0-fpm.sock;
 
-    location ~ \.php$ {
-
-    #   include snippets/fastcgi-php.conf;
-    #   fastcgi_pass unix:/var/run/php7.0-fpm.sock;
-
-    try_files $uri =404;
+        try_files \$uri =404;
         fastcgi_pass 127.0.0.1:9000;
-    fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+        fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
         fastcgi_index index.php;
         include fastcgi_params;
-    }
 
-    # deny access to .htaccess files, if Apache's document root
-    # concurs with nginx's one
-    
+        }
+
     location ~ /\.ht {
-        deny all;
+        deny  all;
     }
-
-    location ~ /.well-known {
-        allow all;
-    }
-
 }
 
-
 		" > $sitesAvailable$domain
+
+		### create let'sencrypt cert only.
+		letsencrypt certonly —webroot --non-interactive --keep-until-expiring --agree-tos --quiet -w $rootDir -d $domain
+
 		then
 			echo -e $"There is an ERROR create $domain file"
 			exit;
