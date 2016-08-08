@@ -178,7 +178,7 @@ server {
 		" > $sitesAvailable$domain
 
 		### create let'sencrypt cert only.
-		letsencrypt certonly -webroot --non-interactive --keep-until-expiring --agree-tos --quiet -w $rootDir -d $domain
+		letsencrypt certonly -webroot --non-interactive --keep-until-expiring --agree-tos -w $rootDir -d $domain
 
 		then
 			echo -e $"There is an ERROR create $domain file"
