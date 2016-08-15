@@ -1,6 +1,6 @@
 Virtualhost Manage Script
 ===========
-
+[![Issue Count](https://codeclimate.com/github/AlexR1712/virtualhost/badges/issue_count.svg)](https://codeclimate.com/github/AlexR1712/virtualhost)
 Bash Script to allow create or delete apache/nginx virtual hosts on Ubuntu on a quick way.
 
 ## Installation ##
